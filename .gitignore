@@ -1,0 +1,28 @@
+# Maven
+target/
+*.jar
+*.war
+*.ear
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# Logs
+logs/
+*.log
+
+# Database
+*.mv.db
+*.trace.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config (可选，如果不想提交配置文件)
+# config.properties
