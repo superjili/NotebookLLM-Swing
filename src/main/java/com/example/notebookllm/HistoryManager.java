@@ -2,12 +2,19 @@ package com.example.notebookllm;
 
 import java.sql.*;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.io.FileWriter;
+import java.io.IOException;
 
 // 添加日志导入
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 
 public class HistoryManager {
     // 添加日志实例
@@ -83,5 +90,100 @@ public class HistoryManager {
             throw new RuntimeException(e);
         }
         return results;
+    }
+    
+    /**
+     * 导出历史记录为CSV格式
+     * @param filePath 导出文件路径
+     * @throws IOException 如果文件写入失败
+     */
+    public void exportToCSV(String filePath) throws IOException {
+        logger.info("开始导出历史记录为CSV格式: {}", filePath);
+        
+        List<AnalysisResult> results = list();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        
+        try (FileWriter writer = new FileWriter(filePath)) {
+            // 写入CSV头部
+            writer.write("ID,项目路径,项目名称,项目描述,分析时间,结果摘要\n");
+            
+            // 写入数据行
+            for (AnalysisResult result : results) {
+                writer.write(String.format("%d,\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n",
+                    result.id,
+                    escapeCsv(result.projectPath),
+                    escapeCsv(result.projectName),
+                    escapeCsv(result.projectDescription),
+                    result.analyzedAt.format(formatter),
+                    escapeCsv(getSummary(result.result, 200))
+                ));
+            }
+            
+            logger.info("CSV导出成功，共导出 {} 条记录", results.size());
+        }
+    }
+    
+    /**
+     * 导出历史记录为JSON格式
+     * @param filePath 导出文件路径
+     * @throws IOException 如果文件写入失败
+     */
+    public void exportToJSON(String filePath) throws IOException {
+        logger.info("开始导出历史记录为JSON格式: {}", filePath);
+        
+        List<AnalysisResult> results = list();
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.enable(SerializationFeature.INDENT_OUTPUT);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        
+        ArrayNode arrayNode = mapper.createArrayNode();
+        
+        for (AnalysisResult result : results) {
+            ObjectNode node = mapper.createObjectNode();
+            node.put("id", result.id);
+            node.put("projectPath", result.projectPath);
+            node.put("projectName", result.projectName);
+            node.put("projectDescription", result.projectDescription);
+            node.put("analyzedAt", result.analyzedAt.format(formatter));
+            
+            // 尝试将result字段解析为JSON，如果失败则作为字符串
+            try {
+                Object resultObj = mapper.readValue(result.result, Object.class);
+                node.set("result", mapper.valueToTree(resultObj));
+            } catch (Exception e) {
+                node.put("result", result.result);
+            }
+            
+            arrayNode.add(node);
+        }
+        
+        try (FileWriter writer = new FileWriter(filePath)) {
+            mapper.writeValue(writer, arrayNode);
+            logger.info("JSON导出成功，共导出 {} 条记录", results.size());
+        }
+    }
+    
+    /**
+     * 转义CSV特殊字符
+     */
+    private String escapeCsv(String value) {
+        if (value == null) {
+            return "";
+        }
+        // 替换双引号为两个双引号，并移除换行符
+        return value.replace("\"", "\"\"").replace("\n", " ").replace("\r", "");
+    }
+    
+    /**
+     * 获取文本摘要
+     */
+    private String getSummary(String text, int maxLength) {
+        if (text == null || text.isEmpty()) {
+            return "";
+        }
+        if (text.length() <= maxLength) {
+            return text;
+        }
+        return text.substring(0, maxLength) + "...";
     }
 }

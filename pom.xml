@@ -57,6 +57,74 @@
                     <mainClass>com.example.notebookllm.Main</mainClass>
                 </configuration>
             </plugin>
+            <!-- Maven Assembly Plugin - 打包所有依赖到一个jar -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.6.0</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>com.example.notebookllm.Main</mainClass>
+                        </manifest>
+                    </archive>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                    <finalName>notebookllm</finalName>
+                    <appendAssemblyId>false</appendAssemblyId>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Launch4j Maven Plugin - 将jar转换为exe -->
+            <plugin>
+                <groupId>com.akathist.maven.plugins.launch4j</groupId>
+                <artifactId>launch4j-maven-plugin</artifactId>
+                <version>2.5.0</version>
+                <executions>
+                    <execution>
+                        <id>l4j-gui</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>launch4j</goal>
+                        </goals>
+                        <configuration>
+                            <headerType>gui</headerType>
+                            <outfile>target/NotebookLLM.exe</outfile>
+                            <jar>target/notebookllm.jar</jar>
+                            <errTitle>NotebookLLM Error</errTitle>
+                            <classPath>
+                                <mainClass>com.example.notebookllm.Main</mainClass>
+                            </classPath>
+                            <jre>
+                                <minVersion>17</minVersion>
+                                <opts>
+                                    <opt>-Dfile.encoding=UTF-8</opt>
+                                </opts>
+                            </jre>
+                            <versionInfo>
+                                <fileVersion>0.1.0.0</fileVersion>
+                                <txtFileVersion>0.1.0</txtFileVersion>
+                                <fileDescription>NotebookLLM - AI项目分析工具</fileDescription>
+                                <copyright>Copyright © 2025</copyright>
+                                <productVersion>0.1.0.0</productVersion>
+                                <txtProductVersion>0.1.0</txtProductVersion>
+                                <productName>NotebookLLM</productName>
+                                <internalName>notebookllm</internalName>
+                                <originalFilename>NotebookLLM.exe</originalFilename>
+                            </versionInfo>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

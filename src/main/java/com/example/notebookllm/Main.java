@@ -611,11 +611,13 @@ public class Main {
         JButton refresh = createStyledButton("刷新");
         JButton details = createStyledButton("查看详情");
         JButton generateManual = createStyledButton("生成使用手册");
+        JButton exportButton = createStyledButton("导出记录");
         JButton openFolder = createStyledButton("打开文件夹");
         JButton close = createStyledButton("关闭");
         btns.add(refresh);
         btns.add(details);
         btns.add(generateManual);
+        btns.add(exportButton);
         btns.add(openFolder);
         btns.add(close);
         dlg.add(btns, BorderLayout.SOUTH);
@@ -703,6 +705,12 @@ public class Main {
                 JOptionPane.showMessageDialog(dlg, "生成使用手册失败：" + ex.getMessage());
                 logger.error("生成使用手册失败", ex);
             }
+        });
+
+        // 添加导出功能
+        exportButton.addActionListener(ev -> {
+            logger.debug("用户点击导出记录按钮");
+            showExportDialog(dlg, hm);
         });
 
         // 添加打开文件夹功能
@@ -823,14 +831,32 @@ public class Main {
         
         JDialog dlg = new JDialog(SwingUtilities.getWindowAncestor(parent), "分析详情", Dialog.ModalityType.APPLICATION_MODAL);
         dlg.setLayout(new BorderLayout());
-        dlg.setBackground(PANEL_COLOR); // 设置对话框背景色
+        dlg.setBackground(PANEL_COLOR);
         
+        // 创建顶部信息面板
+        JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 10));
+        headerPanel.setBackground(new Color(240, 248, 255)); // 淡蓝色背景
+        headerPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, BORDER_COLOR));
+        
+        JLabel infoLabel = new JLabel("ℹ️ 分析结果详情");
+        infoLabel.setFont(new Font("微软雅黑", Font.BOLD, 14));
+        infoLabel.setForeground(PRIMARY_COLOR);
+        headerPanel.add(infoLabel);
+        
+        dlg.add(headerPanel, BorderLayout.NORTH);
+        
+        // 创建文本区域并美化格式
         JTextArea ta = new JTextArea();
         ta.setEditable(false);
-        ta.setFont(new Font("微软雅黑", Font.PLAIN, 12));
-        ta.setForeground(TEXT_COLOR); // 设置文字颜色
-        ta.setBackground(PANEL_COLOR); // 设置背景颜色
-        ta.setCaretColor(TEXT_COLOR); // 设置光标颜色
+        ta.setFont(new Font("Consolas", Font.PLAIN, 12)); // 使用等宽字体更好地显示JSON
+        ta.setForeground(TEXT_COLOR);
+        ta.setBackground(Color.WHITE);
+        ta.setCaretColor(TEXT_COLOR);
+        ta.setLineWrap(true);
+        ta.setWrapStyleWord(true);
+        ta.setMargin(new java.awt.Insets(10, 15, 10, 15)); // 内边距
+        
+        // 美化JSON格式
         try {
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
             Object obj = mapper.readValue(analysisJson, Object.class);
@@ -839,17 +865,58 @@ public class Main {
         } catch (Exception e) {
             ta.setText(analysisJson);
         }
+        
         JScrollPane scrollPane = new JScrollPane(ta);
-        scrollPane.getViewport().setBackground(PANEL_COLOR);
+        scrollPane.getViewport().setBackground(Color.WHITE);
         scrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16); // 加快滚动速度
         dlg.add(scrollPane, BorderLayout.CENTER);
+        
+        // 按钮面板
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+        buttonPanel.setBackground(BACKGROUND_COLOR);
+        
+        JButton copyBtn = createStyledButton("复制内容");
+        JButton saveBtn = createStyledButton("保存为文件");
         JButton close = createStyledButton("关闭");
+        
+        // 复制到剪贴板
+        copyBtn.addActionListener(ev -> {
+            ta.selectAll();
+            ta.copy();
+            ta.setCaretPosition(0);
+            JOptionPane.showMessageDialog(dlg, "内容已复制到剪贴板！");
+            logger.debug("用户复制了分析结果内容");
+        });
+        
+        // 保存为文件
+        saveBtn.addActionListener(ev -> {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setSelectedFile(new File("analysis_" + 
+                java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + 
+                ".json"));
+            int result = fileChooser.showSaveDialog(dlg);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File file = fileChooser.getSelectedFile();
+                try (java.io.FileWriter writer = new java.io.FileWriter(file)) {
+                    writer.write(ta.getText());
+                    JOptionPane.showMessageDialog(dlg, "已保存到: " + file.getAbsolutePath());
+                    logger.info("分析结果已保存到文件: {}", file.getAbsolutePath());
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(dlg, "保存失败: " + ex.getMessage());
+                    logger.error("保存分析结果失败", ex);
+                }
+            }
+        });
+        
         close.addActionListener(ev -> dlg.dispose());
-        JPanel p = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
-        p.setBackground(BACKGROUND_COLOR);
-        p.add(close);
-        dlg.add(p, BorderLayout.SOUTH);
-        dlg.setSize(800, 600);
+        
+        buttonPanel.add(copyBtn);
+        buttonPanel.add(saveBtn);
+        buttonPanel.add(close);
+        dlg.add(buttonPanel, BorderLayout.SOUTH);
+        
+        dlg.setSize(900, 650);
         dlg.setLocationRelativeTo(parent);
         dlg.setVisible(true);
     }
@@ -859,8 +926,8 @@ public class Main {
         
         JDialog dlg = new JDialog(SwingUtilities.getWindowAncestor(parent), "结构化分析结果", Dialog.ModalityType.APPLICATION_MODAL);
         dlg.setLayout(new BorderLayout());
-        dlg.setBackground(PANEL_COLOR); // 设置对话框背景色
-
+        dlg.setBackground(PANEL_COLOR);
+        
         com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
         com.fasterxml.jackson.databind.JsonNode root;
         try {
@@ -870,131 +937,199 @@ public class Main {
             logger.error("解析JSON失败", e);
             return;
         }
+        
+        // 创建顶部信息面板 - 显示项目名称和风险等级
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setBackground(new Color(240, 248, 255)); // 淡蓝色背景
+        headerPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 2, 0, BORDER_COLOR),
+            BorderFactory.createEmptyBorder(10, 15, 10, 15)
+        ));
+        
+        String projectName = root.path("project_name").asText("项目分析");
+        JLabel titleLabel = new JLabel("📊 " + projectName);
+        titleLabel.setFont(new Font("微软雅黑", Font.BOLD, 16));
+        titleLabel.setForeground(PRIMARY_COLOR);
+        headerPanel.add(titleLabel, BorderLayout.WEST);
+        
+        String risk = root.path("risk_level").asText("");
+        if (!risk.isEmpty()) {
+            JLabel riskLabel = new JLabel("风险等级: " + risk.toUpperCase());
+            riskLabel.setFont(new Font("微软雅黑", Font.BOLD, 12));
+            // 根据风险等级设置颜色
+            if ("high".equalsIgnoreCase(risk)) {
+                riskLabel.setForeground(new Color(220, 53, 69)); // 红色
+            } else if ("medium".equalsIgnoreCase(risk)) {
+                riskLabel.setForeground(new Color(255, 193, 7)); // 黄色
+            } else {
+                riskLabel.setForeground(new Color(40, 167, 69)); // 绿色
+            }
+            riskLabel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(riskLabel.getForeground(), 1, true),
+                BorderFactory.createEmptyBorder(3, 10, 3, 10)
+            ));
+            headerPanel.add(riskLabel, BorderLayout.EAST);
+        }
+        
+        dlg.add(headerPanel, BorderLayout.NORTH);
 
         JPanel main = new JPanel();
         main.setLayout(new BoxLayout(main, BoxLayout.Y_AXIS));
         main.setBackground(PANEL_COLOR);
-        main.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        main.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
-        // Summary
+        // Summary - 使用卡片样式
         String summary = root.path("summary").asText("");
-        JTextArea sumArea = new JTextArea(summary);
-        sumArea.setLineWrap(true);
-        sumArea.setWrapStyleWord(true);
-        sumArea.setEditable(false);
-        sumArea.setFont(new Font("微软雅黑", Font.PLAIN, 12));
-        sumArea.setForeground(TEXT_COLOR); // 设置文字颜色
-        sumArea.setBackground(PANEL_COLOR); // 设置背景颜色
-        sumArea.setCaretColor(TEXT_COLOR); // 设置光标颜色
-        sumArea.setBorder(BorderFactory.createTitledBorder("摘要"));
-        sumArea.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createTitledBorder("摘要"),
-            BorderFactory.createEmptyBorder(5, 5, 5, 5)
-        ));
-        main.add(new JScrollPane(sumArea));
+        if (!summary.isEmpty()) {
+            JPanel summaryPanel = createStyledPanel("📝 项目概述");
+            JTextArea sumArea = new JTextArea(summary);
+            sumArea.setLineWrap(true);
+            sumArea.setWrapStyleWord(true);
+            sumArea.setEditable(false);
+            sumArea.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+            sumArea.setForeground(TEXT_COLOR);
+            sumArea.setBackground(Color.WHITE);
+            sumArea.setCaretColor(TEXT_COLOR);
+            sumArea.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+            JScrollPane sumScroll = new JScrollPane(sumArea);
+            sumScroll.setBorder(BorderFactory.createEmptyBorder());
+            sumScroll.setPreferredSize(new Dimension(800, 80));
+            summaryPanel.add(sumScroll);
+            main.add(summaryPanel);
+            main.add(Box.createVerticalStrut(10));
+        }
 
-        // Modules (table)
+        // Modules (table) - 使用卡片样式
         if (root.has("modules") && root.get("modules").isArray()) {
+            JPanel modulesPanel = createStyledPanel("📦 模块列表");
+            
             java.util.List<com.fasterxml.jackson.databind.JsonNode> mods = new java.util.ArrayList<>();
             for (com.fasterxml.jackson.databind.JsonNode n : root.get("modules")) mods.add(n);
-            String[] cols = new String[] {"Name", "Description"};
+            String[] cols = new String[] {"模块名称", "模块说明"};
             Object[][] data = new Object[mods.size()][2];
             for (int i = 0; i < mods.size(); i++) {
                 data[i][0] = mods.get(i).path("name").asText();
                 data[i][1] = mods.get(i).path("description").asText();
             }
             javax.swing.table.DefaultTableModel model = new javax.swing.table.DefaultTableModel(data, cols) {
-                public boolean isCellEditable(int row, String[]  col) { return false; }
+                public boolean isCellEditable(int row, int col) { return false; }
             };
             JTable table = new JTable(model);
+            // 使用专门的样式化方法，确保表格在白色背景下可读
             table.setFont(new Font("微软雅黑", Font.PLAIN, 12));
-            table.setForeground(TEXT_COLOR); // 设置文字颜色
-            table.setBackground(PANEL_COLOR); // 设置背景颜色
-            table.setPreferredScrollableViewportSize(new Dimension(700, 120));
-            JPanel pMods = new JPanel(new BorderLayout());
-            pMods.setBackground(PANEL_COLOR);
-            pMods.setBorder(BorderFactory.createTitledBorder("模块 (Modules)"));
-            pMods.add(new JScrollPane(table), BorderLayout.CENTER);
-            main.add(pMods);
+            table.getTableHeader().setFont(new Font("微软雅黑", Font.BOLD, 12));
+            table.getTableHeader().setBackground(PRIMARY_COLOR);
+            table.getTableHeader().setForeground(Color.WHITE);
+            table.setGridColor(BORDER_COLOR);
+            table.setRowHeight(25);
+            table.setSelectionBackground(new Color(173, 216, 230));
+            table.setSelectionForeground(TEXT_COLOR);
+            table.setBackground(Color.WHITE);
+            table.setForeground(TEXT_COLOR);
+            table.setPreferredScrollableViewportSize(new Dimension(800, 120));
+            JScrollPane tableScroll = new JScrollPane(table);
+            tableScroll.setBorder(BorderFactory.createEmptyBorder());
+            modulesPanel.add(tableScroll);
+            main.add(modulesPanel);
+            main.add(Box.createVerticalStrut(10));
         }
 
-        // Issues and Suggestions
-        JPanel pIS = new JPanel(new GridLayout(1,2, 10, 0));
-        pIS.setBackground(PANEL_COLOR);
+        // Issues and Suggestions - 并排显示
+        JPanel issuesSuggestionsPanel = new JPanel(new GridLayout(1, 2, 15, 0));
+        issuesSuggestionsPanel.setBackground(PANEL_COLOR);
+        issuesSuggestionsPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200));
+        
         // Issues
+        JPanel issuesPanel = createStyledPanel("⚠️ 发现的问题");
         java.util.List<String> issues = new java.util.ArrayList<>();
         if (root.has("issues") && root.get("issues").isArray()) {
             for (com.fasterxml.jackson.databind.JsonNode n : root.get("issues")) issues.add(n.asText());
         }
         JList<String> issuesList = new JList<>(issues.toArray(new String[0]));
-        issuesList.setFont(new Font("微软雅黑", Font.PLAIN, 12));
-        issuesList.setForeground(TEXT_COLOR); // 设置文字颜色
-        issuesList.setBackground(PANEL_COLOR); // 设置背景颜色
-        issuesList.setSelectionForeground(TEXT_COLOR); // 设置选中文字颜色
-        issuesList.setSelectionBackground(new Color(173, 216, 230)); // 设置选中背景颜色
-        JScrollPane issuesPane = new JScrollPane(issuesList);
-        issuesPane.getViewport().setBackground(PANEL_COLOR);
-        issuesPane.setBorder(BorderFactory.createTitledBorder("问题 (Issues)"));
-        pIS.add(issuesPane);
+        styleList(issuesList);
+        JScrollPane issuesScroll = new JScrollPane(issuesList);
+        issuesScroll.setBorder(BorderFactory.createEmptyBorder());
+        issuesPanel.add(issuesScroll);
+        issuesSuggestionsPanel.add(issuesPanel);
 
         // Suggestions
+        JPanel suggestionsPanel = createStyledPanel("💡 优化建议");
         java.util.List<String> suggs = new java.util.ArrayList<>();
         if (root.has("suggestions") && root.get("suggestions").isArray()) {
             for (com.fasterxml.jackson.databind.JsonNode n : root.get("suggestions")) suggs.add(n.asText());
         }
         JList<String> suggList = new JList<>(suggs.toArray(new String[0]));
-        suggList.setFont(new Font("微软雅黑", Font.PLAIN, 12));
-        suggList.setForeground(TEXT_COLOR); // 设置文字颜色
-        suggList.setBackground(PANEL_COLOR); // 设置背景颜色
-        suggList.setSelectionForeground(TEXT_COLOR); // 设置选中文字颜色
-        suggList.setSelectionBackground(new Color(173, 216, 230)); // 设置选中背景颜色
-        JScrollPane suggPane = new JScrollPane(suggList);
-        suggPane.getViewport().setBackground(PANEL_COLOR);
-        suggPane.setBorder(BorderFactory.createTitledBorder("建议 (Suggestions)"));
-        pIS.add(suggPane);
+        styleList(suggList);
+        JScrollPane suggScroll = new JScrollPane(suggList);
+        suggScroll.setBorder(BorderFactory.createEmptyBorder());
+        suggestionsPanel.add(suggScroll);
+        issuesSuggestionsPanel.add(suggestionsPanel);
+        
+        main.add(issuesSuggestionsPanel);
+        main.add(Box.createVerticalStrut(10));
 
-        main.add(pIS);
-
-        // Top files and risk
-        JPanel bottom = new JPanel(new BorderLayout());
-        bottom.setBackground(PANEL_COLOR);
-        java.util.List<String> topFiles = new java.util.ArrayList<>();
+        // Top files - 使用卡片样式
         if (root.has("top_files") && root.get("top_files").isArray()) {
+            JPanel topFilesPanel = createStyledPanel("📄 重要文件");
+            java.util.List<String> topFiles = new java.util.ArrayList<>();
             for (com.fasterxml.jackson.databind.JsonNode n : root.get("top_files")) topFiles.add(n.asText());
+            JList<String> tfList = new JList<>(topFiles.toArray(new String[0]));
+            styleList(tfList);
+            JScrollPane tfScroll = new JScrollPane(tfList);
+            tfScroll.setBorder(BorderFactory.createEmptyBorder());
+            tfScroll.setPreferredSize(new Dimension(800, 100));
+            topFilesPanel.add(tfScroll);
+            main.add(topFilesPanel);
         }
-        JList<String> tfList = new JList<>(topFiles.toArray(new String[0]));
-        tfList.setFont(new Font("微软雅黑", Font.PLAIN, 12));
-        tfList.setForeground(TEXT_COLOR); // 设置文字颜色
-        tfList.setBackground(PANEL_COLOR); // 设置背景颜色
-        tfList.setSelectionForeground(TEXT_COLOR); // 设置选中文字颜色
-        tfList.setSelectionBackground(new Color(173, 216, 230)); // 设置选中背景颜色
-        tfList.setBorder(BorderFactory.createTitledBorder("Top Files"));
-        bottom.add(new JScrollPane(tfList), BorderLayout.CENTER);
-
-        String risk = root.path("risk_level").asText("");
-        JLabel riskLbl = new JLabel("风险等级: " + risk);
-        riskLbl.setFont(new Font("微软雅黑", Font.PLAIN, 12));
-        riskLbl.setForeground(TEXT_COLOR); // 设置文字颜色
-        JPanel pr = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        pr.setBackground(PANEL_COLOR);
-        pr.add(riskLbl);
-        bottom.add(pr, BorderLayout.SOUTH);
-
-        main.add(bottom);
 
         JScrollPane scrollPane = new JScrollPane(main);
         scrollPane.getViewport().setBackground(PANEL_COLOR);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
         dlg.add(scrollPane, BorderLayout.CENTER);
+        
         JButton close2 = createStyledButton("关闭");
         close2.addActionListener(ev -> dlg.dispose());
         JPanel bp = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
         bp.setBackground(BACKGROUND_COLOR);
         bp.add(close2);
         dlg.add(bp, BorderLayout.SOUTH);
-        dlg.setSize(900, 700);
+        dlg.setSize(950, 750);
         dlg.setLocationRelativeTo(parent);
         dlg.setVisible(true);
+    }
+    
+    /**
+     * 创建带标题的样式化面板（卡片样式）
+     */
+    private static JPanel createStyledPanel(String title) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
+            BorderFactory.createEmptyBorder(10, 10, 10, 10)
+        ));
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(new Font("微软雅黑", Font.BOLD, 13));
+        titleLabel.setForeground(PRIMARY_COLOR);
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+        panel.add(titleLabel, BorderLayout.NORTH);
+        
+        return panel;
+    }
+    
+    /**
+     * 样式化列表组件
+     */
+    private static void styleList(JList<?> list) {
+        list.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+        list.setForeground(TEXT_COLOR);
+        list.setBackground(Color.WHITE);
+        list.setSelectionBackground(new Color(173, 216, 230));
+        list.setSelectionForeground(TEXT_COLOR);
+        list.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
     }
     
     /**
@@ -1131,5 +1266,160 @@ public class Main {
         dlg.setSize(900, 700);
         dlg.setLocationRelativeTo(parent);
         dlg.setVisible(true);
+    }
+    
+    /**
+     * 显示导出对话框
+     */
+    private static void showExportDialog(Component parent, HistoryManager historyManager) {
+        logger.debug("显示导出对话框");
+        
+        JDialog exportDlg = new JDialog(SwingUtilities.getWindowAncestor(parent), "导出历史记录", Dialog.ModalityType.APPLICATION_MODAL);
+        exportDlg.setLayout(new BorderLayout());
+        exportDlg.setBackground(PANEL_COLOR);
+        
+        // 创建主面板
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+        mainPanel.setBackground(PANEL_COLOR);
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        
+        // 标题
+        JLabel titleLabel = new JLabel("请选择导出格式:");
+        titleLabel.setFont(new Font("微软雅黑", Font.BOLD, 14));
+        titleLabel.setForeground(TEXT_COLOR);
+        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        mainPanel.add(titleLabel);
+        mainPanel.add(Box.createVerticalStrut(15));
+        
+        // 格式选择面板
+        JPanel formatPanel = new JPanel();
+        formatPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 10));
+        formatPanel.setBackground(PANEL_COLOR);
+        formatPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        
+        ButtonGroup formatGroup = new ButtonGroup();
+        JRadioButton csvRadio = new JRadioButton("CSV 格式 (.csv)");
+        JRadioButton jsonRadio = new JRadioButton("JSON 格式 (.json)");
+        
+        csvRadio.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+        jsonRadio.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+        csvRadio.setForeground(TEXT_COLOR);
+        jsonRadio.setForeground(TEXT_COLOR);
+        csvRadio.setBackground(PANEL_COLOR);
+        jsonRadio.setBackground(PANEL_COLOR);
+        csvRadio.setSelected(true); // 默认选中CSV
+        
+        formatGroup.add(csvRadio);
+        formatGroup.add(jsonRadio);
+        formatPanel.add(csvRadio);
+        formatPanel.add(jsonRadio);
+        
+        mainPanel.add(formatPanel);
+        mainPanel.add(Box.createVerticalStrut(20));
+        
+        // 说明文本
+        JTextArea descArea = new JTextArea();
+        descArea.setText(
+            "CSV 格式:适合在 Excel 中打开，包含基本信息和结果摘要\n" +
+            "JSON 格式:包含完整的分析结果，便于程序处理"
+        );
+        descArea.setEditable(false);
+        descArea.setFont(new Font("微软雅黑", Font.PLAIN, 11));
+        descArea.setForeground(new Color(100, 100, 100));
+        descArea.setBackground(new Color(250, 250, 250));
+        descArea.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER_COLOR, 1),
+            BorderFactory.createEmptyBorder(10, 10, 10, 10)
+        ));
+        descArea.setLineWrap(true);
+        descArea.setWrapStyleWord(true);
+        descArea.setAlignmentX(Component.LEFT_ALIGNMENT);
+        mainPanel.add(descArea);
+        
+        exportDlg.add(mainPanel, BorderLayout.CENTER);
+        
+        // 按钮面板
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+        buttonPanel.setBackground(BACKGROUND_COLOR);
+        
+        JButton exportBtn = createStyledButton("导出");
+        JButton cancelBtn = createStyledButton("取消");
+        
+        exportBtn.addActionListener(e -> {
+            logger.debug("用户确认导出操作");
+            
+            // 获取选中的格式
+            String format = csvRadio.isSelected() ? "csv" : "json";
+            String extension = csvRadio.isSelected() ? ".csv" : ".json";
+            String description = csvRadio.isSelected() ? "CSV 文件" : "JSON 文件";
+            
+            // 显示文件选择对话框
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("保存导出文件");
+            fileChooser.setSelectedFile(new File("history_export_" + 
+                java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + 
+                extension));
+            
+            // 设置文件过滤器
+            fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+                @Override
+                public boolean accept(File f) {
+                    return f.isDirectory() || f.getName().toLowerCase().endsWith(extension);
+                }
+                
+                @Override
+                public String getDescription() {
+                    return description;
+                }
+            });
+            
+            int result = fileChooser.showSaveDialog(exportDlg);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File file = fileChooser.getSelectedFile();
+                
+                // 确保文件扩展名正确
+                if (!file.getName().toLowerCase().endsWith(extension)) {
+                    file = new File(file.getAbsolutePath() + extension);
+                }
+                
+                // 执行导出
+                try {
+                    if ("csv".equals(format)) {
+                        historyManager.exportToCSV(file.getAbsolutePath());
+                    } else {
+                        historyManager.exportToJSON(file.getAbsolutePath());
+                    }
+                    
+                    JOptionPane.showMessageDialog(exportDlg, 
+                        "导出成功！\n\n文件保存在: " + file.getAbsolutePath(),
+                        "导出成功",
+                        JOptionPane.INFORMATION_MESSAGE);
+                    
+                    logger.info("历史记录导出成功: {}", file.getAbsolutePath());
+                    exportDlg.dispose();
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(exportDlg, 
+                        "导出失败: " + ex.getMessage(),
+                        "错误",
+                        JOptionPane.ERROR_MESSAGE);
+                    logger.error("历史记录导出失败", ex);
+                }
+            }
+        });
+        
+        cancelBtn.addActionListener(e -> {
+            exportDlg.dispose();
+            logger.debug("用户取消导出操作");
+        });
+        
+        buttonPanel.add(exportBtn);
+        buttonPanel.add(cancelBtn);
+        exportDlg.add(buttonPanel, BorderLayout.SOUTH);
+        
+        exportDlg.pack();
+        exportDlg.setSize(450, 280);
+        exportDlg.setLocationRelativeTo(parent);
+        exportDlg.setVisible(true);
     }
 }
